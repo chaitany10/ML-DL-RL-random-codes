@@ -1,12 +1,14 @@
 import gym
 import numpy as np
+import matplotlib.pyplot as plt
 
 env = gym.make("MountainCar-v0")
 LEARNING_RATE = 0.1
 DISCOUNT = 0.95
-EPISODES = 25000
+EPISODES = 10000
 SHOW_EVERY = 2000
 DISCRETE_OS_SIZE = [20] * len(env.observation_space.high)
+STATS_EVERY = 100
 
 discrete_os_win_size = (env.observation_space.high - env.observation_space.low)/ DISCRETE_OS_SIZE
 #print((env.observation_space.high - env.observation_space.low)/ DISCRETE_OS_SIZE)
@@ -19,6 +21,10 @@ START_EPSILON_DECAYING = 1
 END_EPSILON_DECAYING = EPISODES//2
 epsilon_decay_value = epsilon/(END_EPSILON_DECAYING - START_EPSILON_DECAYING)
 
+# For stats
+ep_rewards = []
+aggr_ep_rewards = {'ep': [], 'avg': [], 'max': [], 'min': []}
+
 q_table  = np.random.uniform(low=-2, high=0, size=(DISCRETE_OS_SIZE + [env.action_space.n]))
 
 def get_discrete_state(state):
@@ -29,6 +35,7 @@ def get_discrete_state(state):
 for episode in range(EPISODES):
     discrete_state = get_discrete_state(env.reset())
     done = False
+    episode_reward = 0
 
     if episode % SHOW_EVERY == 0:
         render = True
@@ -45,7 +52,7 @@ for episode in range(EPISODES):
         new_state, reward, done, _ = env.step(action)
 
         new_discrete_state = get_discrete_state(new_state)
-
+        episode_reward += reward
         #new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (reward + DISCOUNT * max_future_q)
 
         if render:
@@ -75,4 +82,21 @@ for episode in range(EPISODES):
     if END_EPSILON_DECAYING >= episode >= START_EPSILON_DECAYING:
         epsilon -= epsilon_decay_value
 
+    ep_rewards.append(episode_reward)
+
+    if not episode % STATS_EVERY:
+        average_reward = sum(ep_rewards[-STATS_EVERY:])/STATS_EVERY
+        aggr_ep_rewards['ep'].append(episode)
+        aggr_ep_rewards['avg'].append(average_reward)
+        aggr_ep_rewards['max'].append(max(ep_rewards[-STATS_EVERY:]))
+        aggr_ep_rewards['min'].append(min(ep_rewards[-STATS_EVERY:]))
+        print(f'Episode: {episode:>5d}, average reward: {average_reward:>4.1f}, current epsilon: {epsilon:>1.2f}')
+
+
 env.close()
+
+plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['avg'], label="average rewards")
+plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['max'], label="max rewards")
+plt.plot(aggr_ep_rewards['ep'], aggr_ep_rewards['min'], label="min rewards")
+plt.legend(loc=4)
+plt.show()
